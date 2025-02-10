@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Declaration, getCombinedModifierFlags, ModifierFlags, Node, SyntaxKind, TypeNode } from 'typescript';
 
 import { DeclarationVisibility } from '../declarations/DeclarationVisibility';

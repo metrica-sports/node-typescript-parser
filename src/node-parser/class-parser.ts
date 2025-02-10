@@ -6,10 +6,12 @@ import {
     Node,
     ObjectBindingPattern,
     SyntaxKind,
+    isHeritageClause,
 } from 'typescript';
 
 import { GetterDeclaration, SetterDeclaration } from '../declarations/AccessorDeclaration';
 import { ClassDeclaration as TshClass } from '../declarations/ClassDeclaration';
+import { InterfaceDeclaration as TshInterface } from '../declarations/InterfaceDeclaration';
 import { ConstructorDeclaration as TshConstructor } from '../declarations/ConstructorDeclaration';
 import { DefaultDeclaration as TshDefault } from '../declarations/DefaultDeclaration';
 import { MethodDeclaration as TshMethod } from '../declarations/MethodDeclaration';
@@ -120,7 +122,6 @@ export function parseCtorParams(
 export function parseClass(tsResource: Resource, node: ClassDeclaration): void {
     const name = node.name ? node.name.text : getDefaultResourceIdentifier(tsResource);
     const classDeclaration = new TshClass(name, isNodeExported(node), node.getStart(), node.getEnd());
-
     if (isNodeDefaultExported(node)) {
         classDeclaration.isExported = false;
         tsResource.declarations.push(new TshDefault(classDeclaration.name, tsResource));
@@ -129,6 +130,9 @@ export function parseClass(tsResource: Resource, node: ClassDeclaration): void {
     if (node.typeParameters) {
         classDeclaration.typeParameters = node.typeParameters.map(param => param.getText());
     }
+
+    classDeclaration.isAbstract = node.modifiers !== undefined
+        && node.modifiers.some(m => m.kind === SyntaxKind.AbstractKeyword);
 
     if (node.members) {
         node.members.forEach((o) => {
@@ -213,6 +217,33 @@ export function parseClass(tsResource: Resource, node: ClassDeclaration): void {
                 parseFunctionParts(tsResource, method, o);
             }
         });
+    }
+    
+    if (node.heritageClauses) {
+        node.heritageClauses.forEach((o) => {
+            if(isHeritageClause(o)){
+                o.types.forEach((type) => {
+                    if(o.token == SyntaxKind.ExtendsKeyword){
+                        const className = (type.expression as Identifier).escapedText;
+                        classDeclaration.extends.push(
+                            new TshClass(
+                                className.toString(),
+                                classDeclaration.isExported
+                            )
+                        );
+                    }else if(o.token == SyntaxKind.ImplementsKeyword){
+                        const interfaceName = (type.expression as Identifier).escapedText;
+                        classDeclaration.implements.push(
+                            new TshInterface(
+                                interfaceName.toString(),
+                                classDeclaration.isExported
+                            )
+                        );
+                    }
+                });
+            }
+        })
+        
     }
 
     parseClassIdentifiers(tsResource, node);

@@ -3,6 +3,7 @@ import { Identifier, InterfaceDeclaration, SyntaxKind } from 'typescript';
 import { DeclarationVisibility } from '../declarations/DeclarationVisibility';
 import { DefaultDeclaration } from '../declarations/DefaultDeclaration';
 import { InterfaceDeclaration as TshInterface } from '../declarations/InterfaceDeclaration';
+import { ClassDeclaration as TshClass } from '../declarations/ClassDeclaration';
 import { MethodDeclaration } from '../declarations/MethodDeclaration';
 import { PropertyDeclaration } from '../declarations/PropertyDeclaration';
 import { Resource } from '../resources/Resource';
@@ -15,6 +16,10 @@ import {
     isNodeDefaultExported,
     isNodeExported,
 } from './parse-utilities';
+
+import {
+    isHeritageClause
+} from 'typescript';
 
 /**
  * Parses an interface node into its declaration.
@@ -34,7 +39,24 @@ export function parseInterface(resource: Resource, node: InterfaceDeclaration): 
         interfaceDeclaration.isExported = false;
         resource.declarations.push(new DefaultDeclaration(interfaceDeclaration.name, resource));
     }
+    if (node.heritageClauses) {
+        node.heritageClauses.forEach((o) => {
+            if(isHeritageClause(o)){
+                o.types.forEach((type) => {
+                    if(o.token == SyntaxKind.ExtendsKeyword){
+                        const className = (type.expression as Identifier).escapedText;
+                        interfaceDeclaration.extends.push(
+                            new TshClass(
+                                className.toString(),
+                                interfaceDeclaration.isExported
+                            )
+                        );
+                    }
+                });
+            }
+        })
 
+    }
     if (node.members) {
         node.members.forEach((o) => {
             if (isPropertySignature(o)) {
